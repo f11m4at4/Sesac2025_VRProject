@@ -42,4 +42,57 @@ public: // mouse
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	class UInputAction* IA_Mouse;
 	void Turn(const struct FInputActionValue& Values);
+
+public: // Teleport
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	class UInputAction* IA_Teleport;
+
+	bool bIsDebugDraw = false;
+
+	UFUNCTION(Exec)
+	void ActiveDebugDraw();
+
+	UPROPERTY(VisibleAnywhere)
+	class UStaticMeshComponent* TeleportCircle;
+
+	// 텔레포트 진행여부
+	bool bTeleporting = false;
+
+	// 텔레포트 리셋
+	bool ResetTeleport();
+
+	void TeleportStart(const struct FInputActionValue& Values);
+	void TeleportEnd(const struct FInputActionValue& Values);
+
+	// 직선 텔레포트 그리기
+	void DrawTeleportStraight();
+
+	// 텔레포트 위치
+	FVector TeleportLocation;
+
+public: // Curve Teleport
+	// P = P0 + vt
+	// v = v0 + at
+	// F = ma
+	// 곡선을 이루는 점의 개수(곡선의 부드럽기 정도)
+	UPROPERTY(EditAnywhere, Category="Teleport")
+	int LineSmooth = 40;
+	UPROPERTY(EditAnywhere, Category="Teleport")
+	float CurveForce = 1500;
+	// 중력가속도
+	UPROPERTY(EditAnywhere, Category="Teleport")
+	float Gravity = -5000;
+	// Delta Time
+	UPROPERTY(EditAnywhere, Category="Teleport")
+	float SimulateTime = 0.02f;
+
+	// 기억할 점 리스트
+	TArray<FVector> Lines;
+
+	// 텔레포트 모드전환(Curve or not)
+	UPROPERTY(EditAnywhere, Category="Teleport")
+	bool bTeleportCurve = true;
+
+	// 곡선텔레포트 그리기
+	void DrawTeleportCurve();
 };
