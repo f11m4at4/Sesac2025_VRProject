@@ -95,4 +95,6 @@ public: // Curve Teleport
 
 	// 곡선텔레포트 그리기
 	void DrawTeleportCurve();
+
+	bool CheckHitTeleport(FVector LastPos, FVector& CurPos);
 };

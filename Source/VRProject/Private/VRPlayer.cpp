@@ -163,36 +163,8 @@ void AVRPlayer::DrawTeleportStraight()
 	FVector StartPoint = VRCamera->GetComponentLocation();
 	FVector EndPoint = StartPoint + VRCamera->GetForwardVector() * 1000;
 	// 2. Line 을 쏘기
-	FHitResult HitInfo;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-
-	bool bHit = GetWorld()->LineTraceSingleByChannel(HitInfo, StartPoint, EndPoint, ECC_Visibility, Params);
-	// 3. Line 과 부딪혔다면
-	// 4. 그리고 부딪힌 녀석의 이름에 Floor 가 있다면
-
-	if(bHit)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Hit Object : %s"), *HitInfo.GetActor()->GetActorNameOrLabel());
-
-	}
-	if(bHit && HitInfo.GetActor()->GetActorNameOrLabel().Contains("GroundFloor") == true)
-	{
-		// 텔레포트 UI 활성화
-		TeleportCircle->SetVisibility(true);
-		// -> 부딪힌 지점에 텔레포트 써클 위치시키기
-		TeleportCircle->SetWorldLocation(HitInfo.Location);
-
-		// 텔레포트 위치 지정
-		TeleportLocation = HitInfo.Location;
-	}
-	// 4. 안부딪혔으면
-	else
-	{
-		// -> 써클 안그려지게 하기
-		TeleportCircle->SetVisibility(false);
-	}
-
+	bool bHit = CheckHitTeleport(StartPoint, EndPoint);
+	
 	// 선그리기
 	DrawDebugLine(GetWorld(), StartPoint, EndPoint, FColor::Red, false, -1, 0, 1);
 	if(bIsDebugDraw)
@@ -217,9 +189,14 @@ void AVRPlayer::DrawTeleportCurve()
 		// P = P0 + vt
 		Pos += Velocity * SimulateTime;
 
-
+		bool bHit = CheckHitTeleport(LastPos, Pos);
+		// 부딪혔을 때 반복 중단
 		Lines.Add(Pos);
-		
+
+		if (bHit)
+		{
+			break;
+		}
 	}
 
 	int LineCount = Lines.Num();
@@ -227,5 +204,36 @@ void AVRPlayer::DrawTeleportCurve()
 	{
 		DrawDebugLine(GetWorld(), Lines[i], Lines[i + 1], FColor::Red, false, -1, 0, 1);
 	}
+}
+
+bool AVRPlayer::CheckHitTeleport(FVector LastPos, FVector& CurPos)
+{
+	FHitResult HitInfo;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitInfo, LastPos, CurPos, ECC_Visibility, Params);
+	// 3. Line 과 부딪혔다면
+	// 4. 그리고 부딪힌 녀석의 이름에 Floor 가 있다면
+
+	if( bHit && HitInfo.GetActor()->GetActorNameOrLabel().Contains("GroundFloor") == true )
+	{
+		// 텔레포트 UI 활성화
+		TeleportCircle->SetVisibility(true);
+		// -> 부딪힌 지점에 텔레포트 써클 위치시키기
+		TeleportCircle->SetWorldLocation(HitInfo.Location);
+
+		// 텔레포트 위치 지정
+		TeleportLocation = HitInfo.Location;
+
+		CurPos = TeleportLocation;
+	}
+	// 4. 안부딪혔으면
+	else
+	{
+		// -> 써클 안그려지게 하기
+		TeleportCircle->SetVisibility(false);
+	}
+	return bHit;
 }
 
