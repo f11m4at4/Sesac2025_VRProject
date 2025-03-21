@@ -8,6 +8,10 @@
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/EnhancedInputComponent.h"
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/InputAction.h"
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/InputMappingContext.h"
+#include "MotionControllerComponent.h"
+#include "../../../../Plugins/FX/Niagara/Source/Niagara/Public/NiagaraComponent.h"
+#include "../../../../Plugins/FX/Niagara/Source/Niagara/Classes/NiagaraDataInterfaceArrayFunctionLibrary.h"
+#include "Components/CapsuleComponent.h"
 
 // Sets default values
 AVRPlayer::AVRPlayer()
@@ -17,6 +21,16 @@ AVRPlayer::AVRPlayer()
 
 	VRCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("VRCamera"));
 	VRCamera->SetupAttachment(RootComponent);
+
+	// 모션컨트롤러 컴포넌트 추가
+	LeftHand = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("LeftHand"));
+	LeftHand->SetupAttachment(RootComponent);
+	LeftHand->SetTrackingMotionSource(TEXT("Left"));
+
+	RightHand = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightHand"));
+	RightHand->SetupAttachment(RootComponent);
+	RightHand->SetTrackingMotionSource(TEXT("Right"));
+
 
 	ConstructorHelpers::FObjectFinder<UInputMappingContext> TempIMC(TEXT("'/Game/Input/IMC_VRInput.IMC_VRInput'"));
 	if (TempIMC.Succeeded())
@@ -42,8 +56,12 @@ AVRPlayer::AVRPlayer()
 		IA_Teleport = TempIA_Teleport.Object;
 	}
 
-	TeleportCircle = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TeleportCircle"));
+	TeleportCircle = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TeleportCircle"));
 	TeleportCircle->SetupAttachment(RootComponent);
+
+	// Teleport UI
+	TeleportUIComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TeleportUIComponent"));
+	TeleportUIComponent->SetupAttachment(RootComponent);
 }
 
 // Called when the game starts or when spawned
@@ -71,6 +89,9 @@ void AVRPlayer::Tick(float DeltaTime)
 		{
 			DrawTeleportStraight();
 		}
+
+		// 나이아가라커브가 보여지면 데이터 세팅하자
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(TeleportUIComponent, TEXT("User.PointArray"), Lines);
 	}
 }
 
@@ -115,6 +136,10 @@ void AVRPlayer::Move(const FInputActionValue& Values)
 
 void AVRPlayer::Turn(const FInputActionValue& Values)
 {
+	if( bUsingMouse  == false)
+	{
+		return;	
+	}
 	FVector2d Scale = Values.Get<FVector2d>();
 	AddControllerPitchInput(Scale.Y);
 	AddControllerYawInput(Scale.X);
@@ -135,6 +160,7 @@ bool AVRPlayer::ResetTeleport()
 	// 텔레포트 종료
 	bTeleporting = false;
 	TeleportCircle->SetVisibility(false);
+	TeleportUIComponent->SetVisibility(false);
 
 	return bCanTeleprot;
 }
@@ -142,6 +168,7 @@ bool AVRPlayer::ResetTeleport()
 void AVRPlayer::TeleportStart(const FInputActionValue& Values)
 {
 	bTeleporting = true;
+	TeleportUIComponent->SetVisibility(true);
 }
 
 void AVRPlayer::TeleportEnd(const FInputActionValue& Values)
@@ -154,21 +181,32 @@ void AVRPlayer::TeleportEnd(const FInputActionValue& Values)
 	}
 	
 	// 이동
-	SetActorLocation(TeleportLocation);
+	if(IsWarp)
+	{
+		DoWarp();
+	}
+	else
+	{
+		SetActorLocation(TeleportLocation);
+	}
 }
 
 void AVRPlayer::DrawTeleportStraight()
 {
 	// 1. Line 을 만들기
-	FVector StartPoint = VRCamera->GetComponentLocation();
-	FVector EndPoint = StartPoint + VRCamera->GetForwardVector() * 1000;
+	FVector StartPoint = RightHand->GetComponentLocation();
+	FVector EndPoint = StartPoint + RightHand->GetForwardVector() * 1000;
 	// 2. Line 을 쏘기
 	bool bHit = CheckHitTeleport(StartPoint, EndPoint);
 	
-	// 선그리기
-	DrawDebugLine(GetWorld(), StartPoint, EndPoint, FColor::Red, false, -1, 0, 1);
-	if(bIsDebugDraw)
-		DrawDebugSphere(GetWorld(), StartPoint,  200, 20, FColor::Yellow);
+	Lines.Empty();
+	Lines.Add(StartPoint);
+	Lines.Add(EndPoint);
+
+	//// 선그리기
+	//DrawDebugLine(GetWorld(), StartPoint, EndPoint, FColor::Red, false, -1, 0, 1);
+	//if(bIsDebugDraw)
+	//	DrawDebugSphere(GetWorld(), StartPoint,  200, 20, FColor::Yellow);
 }
 
 void AVRPlayer::DrawTeleportCurve()
@@ -176,9 +214,9 @@ void AVRPlayer::DrawTeleportCurve()
 	// 비워줘야한다.
 	Lines.Empty();
 	// 선이 진행될 힘(방향)
-	FVector Velocity = VRCamera->GetForwardVector() * CurveForce;
+	FVector Velocity = RightHand->GetForwardVector() * CurveForce;
 	// P0
-	FVector Pos = VRCamera->GetComponentLocation();
+	FVector Pos = RightHand->GetComponentLocation();
 	Lines.Add(Pos);
 	// 40번 반복하겠다.
 	for(int i=0;i<LineSmooth;i++)
@@ -199,11 +237,11 @@ void AVRPlayer::DrawTeleportCurve()
 		}
 	}
 
-	int LineCount = Lines.Num();
+	/*int LineCount = Lines.Num();
 	for (int i=0;i<LineCount-1;i++)
 	{
 		DrawDebugLine(GetWorld(), Lines[i], Lines[i + 1], FColor::Red, false, -1, 0, 1);
-	}
+	}*/
 }
 
 bool AVRPlayer::CheckHitTeleport(FVector LastPos, FVector& CurPos)
@@ -235,5 +273,45 @@ bool AVRPlayer::CheckHitTeleport(FVector LastPos, FVector& CurPos)
 		TeleportCircle->SetVisibility(false);
 	}
 	return bHit;
+}
+
+void AVRPlayer::DoWarp()
+{
+	// 1. 워프 활성화 되어 있을 때만 수행
+	if (IsWarp == false)
+	{
+		return;
+	}
+	// 2. 일정시간동안 정해진 위치로 이동하고 싶다.
+	CurrentTime = 0;
+	// 충돌체 꺼주자
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	
+	GetWorldTimerManager().SetTimer(WarpTimer, FTimerDelegate::CreateLambda(
+		[this]()
+		{
+			// 2.1 시간이 흘러야 
+			CurrentTime += GetWorld()->DeltaTimeSeconds;
+			// 2.2 warp time 까지 이동하고 싶다.
+			// target
+			FVector TargetPos = TeleportLocation + FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			// 현재위치
+			FVector CurPos = GetActorLocation();
+			// 2.3 이동하고 싶다.
+			CurPos = FMath::Lerp(CurPos, TargetPos, CurrentTime / WarpTime);
+			SetActorLocation(CurPos);
+
+			// 목적지에 도착했다면
+			if(CurrentTime - WarpTime >= 0)
+			{
+				// -> 목적지 위치로 위치 보정
+				SetActorLocation(TargetPos);
+				// -> 타이머 끄기
+				GetWorldTimerManager().ClearTimer(WarpTimer);
+				// -> 충돌체 다시 활성화
+				GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			}
+		}
+	), 0.02f, true);
 }
 

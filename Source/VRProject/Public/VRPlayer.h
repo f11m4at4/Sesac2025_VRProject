@@ -29,6 +29,13 @@ public:
 public:
 	UPROPERTY(VisibleAnywhere)
 	class UCameraComponent* VRCamera;
+	// 모션컨트롤러 등록
+	UPROPERTY(VisibleAnywhere, Category="MotionController")
+	class UMotionControllerComponent* LeftHand;
+	UPROPERTY(VisibleAnywhere, Category = "MotionController")
+	class UMotionControllerComponent* RightHand;
+
+
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	class UInputMappingContext* IMC_VRInput;
@@ -42,6 +49,8 @@ public: // mouse
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	class UInputAction* IA_Mouse;
 	void Turn(const struct FInputActionValue& Values);
+	UPROPERTY(EditAnywhere, Category="Input")
+	bool bUsingMouse = false;
 
 public: // Teleport
 	UPROPERTY(EditDefaultsOnly, Category="Input")
@@ -53,7 +62,8 @@ public: // Teleport
 	void ActiveDebugDraw();
 
 	UPROPERTY(VisibleAnywhere)
-	class UStaticMeshComponent* TeleportCircle;
+	class UNiagaraComponent* TeleportCircle;
+	//class UStaticMeshComponent* TeleportCircle;
 
 	// 텔레포트 진행여부
 	bool bTeleporting = false;
@@ -97,4 +107,23 @@ public: // Curve Teleport
 	void DrawTeleportCurve();
 
 	bool CheckHitTeleport(FVector LastPos, FVector& CurPos);
+
+public:	// Teleport UI
+	UPROPERTY(VisibleAnywhere)
+	class UNiagaraComponent* TeleportUIComponent;
+
+private:	// Warp
+	// Warp 활성화 여부
+	UPROPERTY(EditAnywhere, Category="Warp", meta = (AllowPrivateAccess=true))
+	bool IsWarp = true;
+	// 1. 등속 -> 정해진 시간에 맞춰 이동하기
+	// 경과시간
+	float CurrentTime = 0;
+	// 워프타임
+	UPROPERTY(EditAnywhere, Category="Warp", meta = (AllowPrivateAccess=true))
+	float WarpTime = 0.2f;
+
+	FTimerHandle WarpTimer;
+	// 워프수행함수
+	void DoWarp();
 };
