@@ -34,7 +34,8 @@ public:
 	class UMotionControllerComponent* LeftHand;
 	UPROPERTY(VisibleAnywhere, Category = "MotionController")
 	class UMotionControllerComponent* RightHand;
-
+	UPROPERTY(VisibleAnywhere, Category = "MotionController")
+	class UMotionControllerComponent* RightAim;
 
 
 	UPROPERTY(EditDefaultsOnly, Category="Input")
@@ -131,4 +132,26 @@ public:		// 총쏘기
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	class UInputAction* IA_Fire;
 	void FireInput(const struct FInputActionValue& Values);
+
+	UPROPERTY(VisibleAnywhere)
+	class UChildActorComponent* CrosshairComp;
+
+	// 크로스헤어 그리기
+	void DrawCrosshair();
+
+public:		// 잡기
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	class UInputAction* IA_Grab;
+
+	// 물체를 잡고있는지 여부
+	bool bIsGrabbing = false;
+
+	// 필요속성 : 잡을 범위
+	UPROPERTY(EditAnywhere, Category="Grab")
+	float GrabRadius = 100;
+
+	void TryGrab(const struct FInputActionValue& Values);
+	void TryUnGrab(const struct FInputActionValue& Values);
+	// 물체를 잡은 상태로 컨트롤 하기
+	void Grabbing();
 };

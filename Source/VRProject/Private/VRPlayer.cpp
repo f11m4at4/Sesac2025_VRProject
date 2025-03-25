@@ -31,6 +31,11 @@ AVRPlayer::AVRPlayer()
 	RightHand->SetupAttachment(RootComponent);
 	RightHand->SetTrackingMotionSource(TEXT("Right"));
 
+	// Aim
+	RightAim = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightAim"));
+	RightAim->SetupAttachment(RootComponent);
+	RightAim->SetTrackingMotionSource(TEXT("RightAim"));
+
 
 	ConstructorHelpers::FObjectFinder<UInputMappingContext> TempIMC(TEXT("'/Game/Input/IMC_VRInput.IMC_VRInput'"));
 	if (TempIMC.Succeeded())
@@ -69,6 +74,14 @@ AVRPlayer::AVRPlayer()
 	// Teleport UI
 	TeleportUIComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TeleportUIComponent"));
 	TeleportUIComponent->SetupAttachment(RootComponent);
+
+	CrosshairComp = CreateDefaultSubobject<UChildActorComponent>(TEXT("CrosshairComp"));
+	CrosshairComp->SetupAttachment(RootComponent);
+	ConstructorHelpers::FClassFinder<AActor> TempCrosshair(TEXT("'/Game/Blueprints/BP_Crosshair.BP_Crosshair_C'"));
+	if (TempCrosshair.Succeeded())
+	{
+		CrosshairComp->SetChildActorClass(TempCrosshair.Class);
+	}
 }
 
 // Called when the game starts or when spawned
@@ -83,6 +96,8 @@ void AVRPlayer::BeginPlay()
 void AVRPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	DrawCrosshair();
 
 	// 텔레포트 활성화시 처리
 	if (bTeleporting == true)
@@ -332,6 +347,87 @@ void AVRPlayer::DoWarp()
 
 void AVRPlayer::FireInput(const FInputActionValue& Values)
 {
+	FVector StartPos = RightAim->GetComponentLocation();
+	FVector EndPos = StartPos + RightAim->GetForwardVector() * 10000;
+	FHitResult HitInfo;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
 
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitInfo, StartPos, EndPos, ECC_Visibility, Params);
+	if (bHit)
+	{
+		// 부딪힌 녀석이 물리기능이 활성화 되어 있으면 날려보내자
+		auto HitComp = HitInfo.GetComponent();
+		if (HitComp && HitComp->IsSimulatingPhysics())
+		{
+			HitComp->AddImpulseAtLocation(RightAim->GetForwardVector() * 1000, HitInfo.Location);
+		}
+	}
+}
+
+void AVRPlayer::DrawCrosshair()
+{
+	FVector StartPos = RightAim->GetComponentLocation();
+	FVector EndPos = StartPos + RightAim->GetForwardVector() * 10000;
+	FHitResult HitInfo;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+
+	DrawDebugLine(GetWorld(), StartPos, EndPos, FColor::Yellow);
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(HitInfo, StartPos, EndPos, ECC_Visibility, Params);
+
+	float Distance = 0;
+	// 부딪혔을 경우
+	if (bHit)
+	{	
+		CrosshairComp->SetWorldLocation(HitInfo.Location);
+		Distance = FVector::Distance(VRCamera->GetComponentLocation(), HitInfo.Location);
+	}
+	// 그렇지 않을 경우
+	else
+	{
+		CrosshairComp->SetWorldLocation(EndPos);
+		Distance = FVector::Distance(VRCamera->GetComponentLocation(), EndPos);
+	}
+
+	// 거리 값을 가지고 크기 설정을 해주겠다.
+	// 최소 값은 1. 최대는? 위에서 구한값
+	Distance = FMath::Max(1, Distance);
+	// 크기 설정
+	CrosshairComp->SetWorldScale3D(FVector(Distance));
+
+	// 빌보딩
+	// ->  카메라쪽으로 바라보도록 하자
+	FVector Direction = CrosshairComp->GetComponentLocation() - VRCamera->GetComponentLocation();
+	CrosshairComp->SetWorldRotation(Direction.Rotation());
+}
+
+// 일정 범위 안에 있는 물체를 잡고 싶다.
+void AVRPlayer::TryGrab(const FInputActionValue& Values)
+{
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	FVector HandPos = RightHand->GetComponentLocation();
+	TArray<FOverlapResult> HitObjects;
+	bool bHit = GetWorld()->OverlapMultiByChannel(HitObjects, HandPos, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(GrabRadius), Params);
+
+	// 충돌한 물체가 없으면 아무처리하지 않는다.
+	if (bHit == false)
+	{
+		return;
+	}
+	
+	// 가장 가까운 물체를 검출하자.
+}
+
+void AVRPlayer::TryUnGrab(const FInputActionValue& Values)
+{
+}
+
+void AVRPlayer::Grabbing()
+{
 }
 
