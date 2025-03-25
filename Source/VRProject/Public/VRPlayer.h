@@ -150,6 +150,10 @@ public:		// 잡기
 	UPROPERTY(EditAnywhere, Category="Grab")
 	float GrabRadius = 100;
 
+	// 잡은 물체 기억할 변수
+	UPROPERTY()
+	class UPrimitiveComponent* grabbedObject;
+
 	void TryGrab(const struct FInputActionValue& Values);
 	void TryUnGrab(const struct FInputActionValue& Values);
 	// 물체를 잡은 상태로 컨트롤 하기

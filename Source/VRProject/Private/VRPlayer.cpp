@@ -68,6 +68,13 @@ AVRPlayer::AVRPlayer()
 		IA_Fire = TempIA_Fire.Object;
 	}
 
+	// 잡기
+	ConstructorHelpers::FObjectFinder<UInputAction> TempIA_Grab(TEXT("'/Game/Input/IA_VRGrab.IA_VRGrab'"));
+	if( TempIA_Grab.Succeeded() )
+	{
+		IA_Grab = TempIA_Grab.Object;
+	}
+
 	TeleportCircle = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TeleportCircle"));
 	TeleportCircle->SetupAttachment(RootComponent);
 
@@ -145,6 +152,11 @@ void AVRPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 		// 총쏘기
 		InputSystem->BindAction(IA_Fire, ETriggerEvent::Started, this, &AVRPlayer::FireInput);
+
+		// 잡기
+		InputSystem->BindAction(IA_Grab, ETriggerEvent::Started, this, &AVRPlayer::TryGrab);
+		InputSystem->BindAction(IA_Grab, ETriggerEvent::Completed, this, &AVRPlayer::TryUnGrab);
+
 	}
 }
 
@@ -407,6 +419,10 @@ void AVRPlayer::DrawCrosshair()
 // 일정 범위 안에 있는 물체를 잡고 싶다.
 void AVRPlayer::TryGrab(const FInputActionValue& Values)
 {
+	// 이미 잡고 있을 때는 그만 잡게 해야지.
+	
+
+
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
 
@@ -421,10 +437,74 @@ void AVRPlayer::TryGrab(const FInputActionValue& Values)
 	}
 	
 	// 가장 가까운 물체를 검출하자.
+	int Closest = -1;
+	// 손과 가장 가까운 물체를 검색
+	for (int i=0; i< HitObjects.Num();i++)
+	{
+		// 물체를 던지기를 하고싶다.
+		// 물리가 활성화 되어 있는 물체만 검출
+		auto HitComp = HitObjects[i].GetComponent();
+		if (HitComp->IsSimulatingPhysics() == false)
+		{
+			continue;
+		}
+
+		if (Closest == -1)
+		{
+			Closest = i;
+		}
+
+		// 물체를 잡고 있는 상태로 설정
+		bIsGrabbing = true;
+
+		// 현재 가장 손과  가까운 위치
+		FVector ClosestPos = HitObjects[Closest].GetActor()->GetActorLocation();
+		float ClosestDistance = FVector::Distance(ClosestPos, HandPos);
+
+		// 다음 물체와의 거리
+		FVector NextPos = HitObjects[i].GetActor()->GetActorLocation();
+		float NextDistance = FVector::Distance(NextPos, HandPos);
+
+		// 다음 물체가 더 손과 가까우면
+		if(NextDistance < ClosestDistance)
+		{
+			// -> 가장 가까운 물체 인덱스 교체
+			Closest = i;
+		}
+	}
+
+	// 물체를 잡았다면
+	if(bIsGrabbing)
+	{
+		grabbedObject = HitObjects[Closest].GetComponent();
+		// 붙이기 전에 먼저 물리기능 꺼주자.
+		grabbedObject->SetSimulatePhysics(false);
+		// 충돌체는? 꺼주자
+		grabbedObject->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HitObjects[Closest].GetActor()->SetActorLocation(HandPos);
+		// -> 손에 붙여주자
+		grabbedObject->AttachToComponent(RightHand, FAttachmentTransformRules::KeepWorldTransform);
+
+		UE_LOG(LogTemp, Warning, TEXT("Grab!!!!!!!!!!!!!!!!!"));
+	}
 }
 
 void AVRPlayer::TryUnGrab(const FInputActionValue& Values)
 {
+	// 물체를 잡고 있지 않다면
+	if (bIsGrabbing == false)
+	{
+		return;
+	}
+
+	bIsGrabbing = false;
+	// 손에서 떼주자.
+	// 손에 붙어 있는 물체를 Detach 해주자.
+	grabbedObject->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	// 물리기능 활성화
+	grabbedObject->SetSimulatePhysics(true);
+	// 충돌체 활성화
+	grabbedObject->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
 
 void AVRPlayer::Grabbing()
