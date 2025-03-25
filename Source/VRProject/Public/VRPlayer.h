@@ -126,4 +126,9 @@ private:	// Warp
 	FTimerHandle WarpTimer;
 	// 워프수행함수
 	void DoWarp();
+
+public:		// 총쏘기
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	class UInputAction* IA_Fire;
+	void FireInput(const struct FInputActionValue& Values);
 };

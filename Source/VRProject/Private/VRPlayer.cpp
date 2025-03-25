@@ -56,6 +56,13 @@ AVRPlayer::AVRPlayer()
 		IA_Teleport = TempIA_Teleport.Object;
 	}
 
+	// 총쏘기
+	ConstructorHelpers::FObjectFinder<UInputAction> TempIA_Fire(TEXT("'/Game/Input/IA_VRFire.IA_VRFire'"));
+	if( TempIA_Fire.Succeeded() )
+	{
+		IA_Fire = TempIA_Fire.Object;
+	}
+
 	TeleportCircle = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TeleportCircle"));
 	TeleportCircle->SetupAttachment(RootComponent);
 
@@ -120,6 +127,9 @@ void AVRPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		// 텔레포트
 		InputSystem->BindAction(IA_Teleport, ETriggerEvent::Started, this, &AVRPlayer::TeleportStart);
 		InputSystem->BindAction(IA_Teleport, ETriggerEvent::Completed, this, &AVRPlayer::TeleportEnd);
+
+		// 총쏘기
+		InputSystem->BindAction(IA_Fire, ETriggerEvent::Started, this, &AVRPlayer::FireInput);
 	}
 }
 
@@ -290,19 +300,24 @@ void AVRPlayer::DoWarp()
 	GetWorldTimerManager().SetTimer(WarpTimer, FTimerDelegate::CreateLambda(
 		[this]()
 		{
+			// From -> To 로 Percent 를 이용해 이동한다.
+			// 만약 목적지에 거의 도착하면 도착한것으로 처리한다.
 			// 2.1 시간이 흘러야 
-			CurrentTime += GetWorld()->DeltaTimeSeconds;
+			//CurrentTime += GetWorld()->DeltaTimeSeconds;
 			// 2.2 warp time 까지 이동하고 싶다.
 			// target
 			FVector TargetPos = TeleportLocation + FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 			// 현재위치
 			FVector CurPos = GetActorLocation();
 			// 2.3 이동하고 싶다.
-			CurPos = FMath::Lerp(CurPos, TargetPos, CurrentTime / WarpTime);
+			CurPos = FMath::Lerp(CurPos, TargetPos, 10 * GetWorld()->DeltaTimeSeconds);
 			SetActorLocation(CurPos);
 
 			// 목적지에 도착했다면
-			if(CurrentTime - WarpTime >= 0)
+			// -> 일정 범위안에 들어왔다면 (구충돌, 원충돌)
+			//if(CurrentTime - WarpTime >= 0)
+			float Distance = FVector::Distance(CurPos, TargetPos);
+			if(Distance < 10)
 			{
 				// -> 목적지 위치로 위치 보정
 				SetActorLocation(TargetPos);
@@ -313,5 +328,10 @@ void AVRPlayer::DoWarp()
 			}
 		}
 	), 0.02f, true);
+}
+
+void AVRPlayer::FireInput(const FInputActionValue& Values)
+{
+
 }
 
