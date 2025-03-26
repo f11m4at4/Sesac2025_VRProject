@@ -158,4 +158,33 @@ public:		// 잡기
 	void TryUnGrab(const struct FInputActionValue& Values);
 	// 물체를 잡은 상태로 컨트롤 하기
 	void Grabbing();
+
+	// 이전위치
+	FVector PrePos;
+	// 이전회전
+	FQuat PreRot;
+	// 던질 힘
+	UPROPERTY(EditAnywhere, Category="Grab")
+	float ThrowPower = 500;
+	// 회전 힘
+	UPROPERTY(EditAnywhere, Category="Grab")
+	float ToquePower = 500;
+	// 던질 방향
+	FVector ThrowDirection;
+	// 회전할 방향
+	FQuat DeltaRotation;
+
+public:	// 원거리 물체 잡기
+	UPROPERTY(EditDefaultsOnly, Category="Grab")
+	bool bIsRemoteGrab = true;
+
+	FTimerHandle GrabHandle;
+
+	// 원거리 물체 잡기 함수
+	void RemoteGrab();
+
+	// 원거리 시각화 여부
+	UPROPERTY(EditAnywhere, Category="Grab")
+	bool bIsDrawDebugRemoteGrab = true;
+	void DrawDebugRemoteGrab();
 };
