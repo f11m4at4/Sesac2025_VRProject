@@ -187,4 +187,18 @@ public:	// 원거리 물체 잡기
 	UPROPERTY(EditAnywhere, Category="Grab")
 	bool bIsDrawDebugRemoteGrab = true;
 	void DrawDebugRemoteGrab();
+
+public:	// 진동
+	UPROPERTY(EditDefaultsOnly, Category="Haptic")
+	class UHapticFeedbackEffect_Curve* FireHaptic;
+
+public:	// UI
+	UPROPERTY(VisibleAnywhere, Category="Widget")
+	class UWidgetInteractionComponent* WidgetInteractionComp;
+
+	void ReleaseUIInput(const struct FInputActionValue& Values);
+
+public:	// Hand Animation
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	class UInputMappingContext* IMC_Hand;
 };

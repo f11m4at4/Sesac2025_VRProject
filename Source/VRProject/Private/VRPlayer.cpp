@@ -13,6 +13,8 @@
 #include "../../../../Plugins/FX/Niagara/Source/Niagara/Classes/NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "Components/CapsuleComponent.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
+#include "Haptics/HapticFeedbackEffect_Curve.h"
+#include "Components/WidgetInteractionComponent.h"
 
 // Sets default values
 AVRPlayer::AVRPlayer()
@@ -90,6 +92,15 @@ AVRPlayer::AVRPlayer()
 	{
 		CrosshairComp->SetChildActorClass(TempCrosshair.Class);
 	}
+
+	ConstructorHelpers::FObjectFinder<UHapticFeedbackEffect_Curve> TempHaptic(TEXT("'/Game/Haptics/HF_Fire.HF_Fire'"));
+	if( TempHaptic.Succeeded() )
+	{
+		FireHaptic = TempHaptic.Object;
+	}
+
+	WidgetInteractionComp = CreateDefaultSubobject<UWidgetInteractionComponent>(TEXT("WidgetInteractionComp"));
+	WidgetInteractionComp->SetupAttachment(RightAim);
 }
 
 // Called when the game starts or when spawned
@@ -149,6 +160,7 @@ void AVRPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 		if (SS)
 		{
 			SS->AddMappingContext(IMC_VRInput, 1);
+			SS->AddMappingContext(IMC_Hand, 2);
 		}
 	}
 
@@ -164,6 +176,7 @@ void AVRPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 		// ÃÑ½î±â
 		InputSystem->BindAction(IA_Fire, ETriggerEvent::Started, this, &AVRPlayer::FireInput);
+		InputSystem->BindAction(IA_Fire, ETriggerEvent::Completed, this, &AVRPlayer::ReleaseUIInput);
 
 		// Àâ±â
 		InputSystem->BindAction(IA_Grab, ETriggerEvent::Started, this, &AVRPlayer::TryGrab);
@@ -371,6 +384,17 @@ void AVRPlayer::DoWarp()
 
 void AVRPlayer::FireInput(const FInputActionValue& Values)
 {
+	// UI Interaction
+	WidgetInteractionComp->PressPointerKey(EKeys::LeftMouseButton);
+
+	// haptic Àç»ý
+	auto PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		PC->PlayHapticEffect(FireHaptic, EControllerHand::Right);
+	}
+
+
 	FVector StartPos = RightAim->GetComponentLocation();
 	FVector EndPos = StartPos + RightAim->GetForwardVector() * 10000;
 	FHitResult HitInfo;
@@ -647,5 +671,10 @@ void AVRPlayer::DrawDebugRemoteGrab()
 	{
 		DrawDebugSphere(GetWorld(), HitInfo.Location, 20, 20, FColor::Cyan);
 	}
+}
+
+void AVRPlayer::ReleaseUIInput(const FInputActionValue& Values)
+{
+	WidgetInteractionComp->ReleasePointerKey(EKeys::LeftMouseButton);
 }
 
